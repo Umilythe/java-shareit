@@ -26,7 +26,6 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto create(ItemDto itemDto, Long ownerId) {
-        User owner = UserMapper.toUser(userService.getById(ownerId));
         if (itemDto.getName() == null || itemDto.getName().isEmpty()) {
             throw new EmptyInformationException("Имя не может быть пустым.");
         }
@@ -36,21 +35,20 @@ public class ItemServiceImpl implements ItemService {
         if (itemDto.getAvailable() == null) {
             throw new EmptyInformationException("Статус не может быть пустым");
         }
+        User owner = UserMapper.toUser(userService.getById(ownerId));
         Item item = ItemMapper.toItem(itemDto, owner, null);
         return ItemMapper.toItemDto(itemStorage.create(item));
     }
 
     @Override
     public ItemDto getById(Long id) {
-        Item item = itemStorage.getById(id)
-                .orElseThrow(() -> new NotFoundException("Вещь с id = " + id + " не найдена"));
+        Item item = getItem(id);
         return ItemMapper.toItemDto(item);
     }
 
     @Override
     public ItemDto update(ItemDto itemDto, Long ownerId, Long itemId) {
-        Item item = itemStorage.getById(itemId)
-                .orElseThrow(() -> new NotFoundException("Вещь с id = " + itemDto.getId() + " не найдена"));
+        Item item = getItem(itemId);
         if (!item.getOwner().getId().equals(ownerId)) {
             throw new NotFoundException("Изменять товар может только его владелец.");
         }
@@ -69,7 +67,9 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public List<ItemDto> getByOwner(Long ownerId) {
         List<Item> items = itemStorage.getByOwner(ownerId);
-        return items.stream().map(ItemMapper::toItemDto).collect(Collectors.toList());
+        return items.stream()
+                .map(ItemMapper::toItemDto)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -82,4 +82,8 @@ public class ItemServiceImpl implements ItemService {
                 .collect(Collectors.toList());
     }
 
+    private Item getItem(Long id) {
+        return itemStorage.getById(id)
+                .orElseThrow(() -> new NotFoundException("Вещь с id = " + id + " не найдена"));
+    }
 }

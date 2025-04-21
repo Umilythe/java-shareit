@@ -18,19 +18,11 @@ public class UserStorageImpl implements UserStorage {
 
     @Override
     public User create(User user) {
-        if (user.getEmail() == null) {
-            log.error("Информация о пользователе должна содержать email.");
-            throw new EmptyInformationException("Информация о пользователе должна содержать email.");
-        }
-        Set<String> emails = users.values().stream().map(User::getEmail).collect(Collectors.toSet());
-        if (emails.contains(user.getEmail())) {
-            log.error("Такой email уже используется.");
-            throw new EmailExistsException("Такой email уже используется.");
-        }
-        if (!user.getEmail().contains("@")) {
-            log.error("Email такого формата не может быть использован.");
-            throw new EmptyInformationException("Email такого формата не может быть использован.");
-        }
+        Set<String> emails = users.values()
+                .stream()
+                .map(User::getEmail)
+                .collect(Collectors.toSet());
+        isEmailUsed(emails, user);
         user.setId(id);
         id++;
         users.put(user.getId(), user);
@@ -40,11 +32,12 @@ public class UserStorageImpl implements UserStorage {
     @Override
     public User update(Long id, User newUser) {
         checkUserExistence(id);
-        Set<String> emails = users.values().stream().map(User::getEmail).collect(Collectors.toSet());
-        if (emails.contains(newUser.getEmail())) {
-            log.error("Такой email уже используется.");
-            throw new EmailExistsException("Такой email уже используется.");
-        }
+        Set<String> emails = users.values()
+                .stream()
+                .filter(userStream -> !Objects.equals(userStream.getId(), id))
+                .map(User::getEmail)
+                .collect(Collectors.toSet());
+        isEmailUsed(emails, newUser);
         User user = users.get(id);
         if (newUser.getName() != null) {
             user.setName(newUser.getName());
@@ -78,6 +71,13 @@ public class UserStorageImpl implements UserStorage {
         if (!users.containsKey(userId)) {
             log.error("Пользователя с id= " + userId + " не существует.");
             throw new NotFoundException("Пользователя с id= " + userId + " не существует.");
+        }
+    }
+
+    private void isEmailUsed(Set<String> emails, User user) {
+        if (emails.contains(user.getEmail())) {
+            log.error("Такой email уже используется.");
+            throw new EmailExistsException("Такой email уже используется.");
         }
     }
 }
