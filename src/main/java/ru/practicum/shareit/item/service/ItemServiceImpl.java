@@ -20,8 +20,7 @@ import ru.practicum.shareit.exceptions.ValidationException;
 import ru.practicum.shareit.item.model.Comment;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -83,15 +82,36 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     public List<ItemDtoWithBooking> getByOwner(Long ownerId) {
         userService.getById(ownerId);
-        List<ItemDtoWithBooking> itemsForResponse = new ArrayList<>();
         List<Item> items = itemStorage.findByOwnerId(ownerId);
+        List<Long> itemIds = items.stream()
+                .map(Item::getId)
+                .collect(Collectors.toList());
+        List<ItemDtoWithBooking> itemsForResponse = new ArrayList<>();
+        List<Booking> bookings = bookingStorage.findAllByItemIdOrderByStartAsc(itemIds);
+        Map<Long, List<Booking>> bookingMap = bookings.stream()
+                .collect(Collectors.groupingBy(b -> b.getItem().getId()));
+        List<Comment> comments = commentStorage.findAllByItemIdIn(itemIds);
+        Map<Long, List<CommentDtoResponse>> commentsMap = comments.stream()
+                .collect(Collectors.groupingBy(
+                        c -> c.getItem().getId(),
+                        Collectors.mapping(CommentMapper::toCommentDto, Collectors.toList())));
         for (Item item : items) {
-            List<CommentDtoResponse> comments = commentStorage.findAllByItemId(item.getId()).stream()
-                    .map(CommentMapper::toCommentDto)
-                    .toList();
-            Booking nextBooking = bookingStorage.findTop1ByItemIdAndStartAfterAndStatusOrderByStartAsc(item.getId(), LocalDateTime.now(), Status.APPROVED);
-            Booking lastBooking = bookingStorage.findTop1ByItemIdAndEndBeforeAndStatusOrderByEndDesc(item.getId(), LocalDateTime.now(), Status.APPROVED);
-            ItemDtoWithBooking itemToList = ItemMapper.toItemDtoWithBooking(item, nextBooking, lastBooking, comments);
+            List<CommentDtoResponse> itemComments = commentsMap.get(item.getId());
+            List<Booking> itemBookings;
+            if (bookingMap.get(item.getId()) == null) {
+                itemBookings = Collections.emptyList();
+            } else {
+                itemBookings = bookingMap.get(item.getId());
+            }
+            Booking nextBooking =itemBookings.stream()
+                    .filter(b -> b.getStart().isAfter(LocalDateTime.now()))
+                    .min(Comparator.comparing(Booking::getStart))
+                    .orElse(null);
+            Booking lastBooking = itemBookings.stream()
+                    .filter(b -> b.getEnd().isBefore(LocalDateTime.now()))
+                    .max(Comparator.comparing(Booking::getEnd))
+                    .orElse(null);
+            ItemDtoWithBooking itemToList = ItemMapper.toItemDtoWithBooking(item, nextBooking, lastBooking, itemComments);
             itemsForResponse.add(itemToList);
         }
         return itemsForResponse;
@@ -112,6 +132,9 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public CommentDtoResponse addComment(CommentDtoRequest commentDtoRequest, Long itemId, Long userId) {
+        if (commentDtoRequest.getText() == null || commentDtoRequest.getText().isBlank()) {
+            throw new ValidationException("Текст комментария не может быть пустым.");
+        }
         UserDto authorDto = userService.getById(userId);
         Item item = getItem(itemId);
         List<Booking> bookings = bookingStorage.findAllByBookerIdAndItemIdAndEndBefore(userId, itemId, LocalDateTime.now());

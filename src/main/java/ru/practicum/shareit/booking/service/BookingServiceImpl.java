@@ -31,13 +31,18 @@ public class BookingServiceImpl implements BookingService {
     public BookingDto create(BookingDtoRequest bookingDtoRequest, Long userId) {
         Item item = itemStorage.findById(bookingDtoRequest.getItemId())
                 .orElseThrow(() -> new NotFoundException("Вещь с id = " + " не найдена."));
-        User booker = userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id = " + " не найден."));
+        User booker = findUser(userId);
         if (!item.isAvailable()) {
             throw new ValidationException("Вещь недоступна для бронирования!");
         }
         if (booker.getId().equals(item.getOwner().getId())) {
             throw new ValidationException("Пользователь не может забронировать свою вещь.");
+        }
+        if (bookingDtoRequest.getEnd().isBefore(LocalDateTime.now()) && bookingDtoRequest.getStart().isBefore(LocalDateTime.now())) {
+            throw new ValidationException("Даты начала и окончания бронирования не могут быть в прошлом.");
+        }
+        if (bookingDtoRequest.getEnd().isBefore(bookingDtoRequest.getStart())) {
+            throw new ValidationException("Дата окончания бронирования не может быть раньше начала.");
         }
         Booking booking = BookingMapper.toBooking(bookingDtoRequest, item);
         booking.setBooker(booker);
@@ -47,8 +52,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingDto changeBookingStatus(Long userId, Long bookingId, Boolean approved) {
-        Booking booking = bookingStorage.findById(bookingId)
-                .orElseThrow(() -> new NotFoundException("Бронирование с id = " + bookingId + " не найдено."));
+        Booking booking = findBooking(bookingId);
         if (!booking.getItem().getOwner().getId().equals(userId)) {
             throw new ValidationException("Только владелец вещи может изменить статус.");
         }
@@ -65,10 +69,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingDto getBooking(Long userId, Long bookingId) {
-        Booking booking = bookingStorage.findById(bookingId)
-                .orElseThrow(() -> new NotFoundException("Бронирование с id = " + bookingId + " не найдено."));
-        User user = userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id = " + userId + " не найден."));
+        Booking booking = findBooking(bookingId);
+        findUser(userId);
         if (!booking.getBooker().getId().equals(userId) && !booking.getItem().getOwner().getId().equals(userId)) {
             throw new ValidationException("Информацию о бронировании может получить только владелец вещи или арендатор.");
         }
@@ -77,8 +79,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<BookingDto> getUserBookingsByState(Long userId, String state) {
-        User user = userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id = " + userId + " не найден."));
+        findUser(userId);
         List<Booking> bookings;
         switch (state.toUpperCase()) {
             case "ALL":
@@ -109,8 +110,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public List<BookingDto> getUserItemsBookingsByState(Long userId, String state) {
-        User user = userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id = " + userId + " не найден."));
+        findUser(userId);
         List<Booking> bookings;
         switch (state.toUpperCase()) {
             case "ALL":
@@ -137,5 +137,17 @@ public class BookingServiceImpl implements BookingService {
         return bookings.stream()
                 .map(BookingMapper::toBookingDto)
                 .collect(Collectors.toList());
+    }
+
+    private User findUser(Long userId) {
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id = " + userId + " не найден."));
+        return user;
+    }
+
+    private Booking findBooking (Long bookingId) {
+        Booking booking = bookingStorage.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Бронирование с id = " + bookingId + " не найдено."));
+        return booking;
     }
 }
