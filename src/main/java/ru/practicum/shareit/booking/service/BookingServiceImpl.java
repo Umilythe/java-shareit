@@ -145,7 +145,7 @@ public class BookingServiceImpl implements BookingService {
         return user;
     }
 
-    private Booking findBooking (Long bookingId) {
+    private Booking findBooking(Long bookingId) {
         Booking booking = bookingStorage.findById(bookingId)
                 .orElseThrow(() -> new NotFoundException("Бронирование с id = " + bookingId + " не найдено."));
         return booking;

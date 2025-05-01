@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.model.Booking;
-import ru.practicum.shareit.booking.model.Status;
 import ru.practicum.shareit.booking.storage.BookingStorage;
 import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
@@ -103,7 +102,7 @@ public class ItemServiceImpl implements ItemService {
             } else {
                 itemBookings = bookingMap.get(item.getId());
             }
-            Booking nextBooking =itemBookings.stream()
+            Booking nextBooking = itemBookings.stream()
                     .filter(b -> b.getStart().isAfter(LocalDateTime.now()))
                     .min(Comparator.comparing(Booking::getStart))
                     .orElse(null);
