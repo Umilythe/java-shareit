@@ -22,7 +22,7 @@ public class ExceptionHandler {
 
     @org.springframework.web.bind.annotation.ExceptionHandler
     @ResponseStatus(HttpStatus.CONFLICT)
-    public Map<String, String> dealWithValidationException(EmailExistsException e) {
+    public Map<String, String> dealWithEmailExistsException(EmailExistsException e) {
         Map<String, String> response = new HashMap<>();
         log.error("error", e.getMessage());
         response.put("error:", e.getMessage());
@@ -41,6 +41,15 @@ public class ExceptionHandler {
     @org.springframework.web.bind.annotation.ExceptionHandler
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, String> dealWithEmptyInformatonException(EmptyInformationException e) {
+        Map<String, String> response = new HashMap<>();
+        log.error("error", e.getMessage());
+        response.put("error", e.getMessage());
+        return response;
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> dealWithValidationException(ValidationException e) {
         Map<String, String> response = new HashMap<>();
         log.error("error", e.getMessage());
         response.put("error", e.getMessage());
