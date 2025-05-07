@@ -2,7 +2,6 @@ package ru.practicum.shareit.request.dto;
 
 import ru.practicum.shareit.request.model.ItemRequest;
 import ru.practicum.shareit.user.User;
-import ru.practicum.shareit.user.UserDto;
 
 import java.time.LocalDateTime;
 
@@ -17,7 +16,7 @@ public class ItemRequestMapper {
 
     }
 
-    public static ItemRequest toItemRequest (ItemRequestDto itemRequestDto, User requestor) {
+    public static ItemRequest toItemRequest(ItemRequestDto itemRequestDto, User requestor) {
         return ItemRequest.builder()
                 .description(itemRequestDto.getDescription())
                 .requestor(requestor)
