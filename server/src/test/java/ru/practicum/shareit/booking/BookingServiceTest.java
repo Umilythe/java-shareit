@@ -9,18 +9,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingDtoRequest;
-import ru.practicum.shareit.booking.service.BookingService;
+import ru.practicum.shareit.booking.service.BookingServiceImpl;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.exceptions.ValidationException;
 import ru.practicum.shareit.item.dto.ItemDto;
-import ru.practicum.shareit.item.service.ItemService;
+import ru.practicum.shareit.item.service.ItemServiceImpl;
 import ru.practicum.shareit.user.UserDto;
-import ru.practicum.shareit.user.service.UserService;
+import ru.practicum.shareit.user.service.UserServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static ru.practicum.shareit.booking.model.Status.APPROVED;
+import static ru.practicum.shareit.booking.model.Status.REJECTED;
 
 @Transactional
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
@@ -28,13 +29,13 @@ import static ru.practicum.shareit.booking.model.Status.APPROVED;
 public class BookingServiceTest {
 
     @Autowired
-    ItemService itemService;
+    ItemServiceImpl itemService;
 
     @Autowired
-    UserService userService;
+    UserServiceImpl userService;
 
     @Autowired
-    BookingService bookingService;
+    BookingServiceImpl bookingService;
 
     static UserDto userDtoRequest1;
     static UserDto userDtoRequest2;
@@ -79,6 +80,29 @@ public class BookingServiceTest {
     }
 
     @Test
+    void shouldNotCreateBookingForOwner() {
+        UserDto userDtoResponse = userService.create(userDtoRequest1);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(1), LocalDateTime.now().minusMinutes(30));
+
+        Assertions.assertThatThrownBy(() ->
+                bookingService.create(bookingDtoRequest, userDtoResponse.getId())).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void shouldNotCreateBookingWithEndBeforePast() {
+        UserDto userDtoResponse = userService.create(userDtoRequest1);
+        UserDto booker = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(3), LocalDateTime.now().plusHours(1));
+
+        Assertions.assertThatThrownBy(() ->
+                bookingService.create(bookingDtoRequest, booker.getId())).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
     void shouldNotCreateBookingNotAvailableItem() {
         UserDto userDtoResponse = userService.create(userDtoRequest1);
         ItemDto itemDtoNotAvailable =
@@ -108,6 +132,21 @@ public class BookingServiceTest {
     }
 
     @Test
+    void shouldNotApproveBooking() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(30));
+        BookingDto bookingDtoResponse = bookingService.create(bookingDtoRequest, userDtoResponse2.getId());
+
+        BookingDto bookingApproveDto = bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDtoResponse.getId(),
+                false);
+
+        Assertions.assertThat(bookingApproveDto.getStatus()).isEqualTo(REJECTED);
+    }
+
+    @Test
     void update_shouldNotApproveNoBooking() {
         UserDto userDtoResponse = userService.create(userDtoRequest1);
 
@@ -131,7 +170,6 @@ public class BookingServiceTest {
         Assertions.assertThat(bookingDtoResponse.getStart()).isEqualTo(findBookingDto.getStart());
         Assertions.assertThat(bookingDtoResponse.getEnd()).isEqualTo(findBookingDto.getEnd());
     }
-
 
     @Test
     void findById_shouldNotFindBookingByIdNoBooking() {
@@ -163,12 +201,294 @@ public class BookingServiceTest {
         Assertions.assertThat(bookings.size()).isEqualTo(3);
     }
 
-
     @Test
     void getUserItemsBookingsByState_shouldNotFindNoUser() {
         Assertions.assertThatThrownBy(() ->
                 bookingService.getUserItemsBookingsByState(1L, "ALL")).isInstanceOf(NotFoundException.class);
     }
 
+    @Test
+    void shouldFindFutureBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserBookingsByState(userDtoResponse2.getId(), "FUTURE");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindPastBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(10), LocalDateTime.now().minusHours(5));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(4), LocalDateTime.now().minusHours(2));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusMinutes(3), LocalDateTime.now().plusHours(185));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserBookingsByState(userDtoResponse2.getId(), "PAST");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldFindCurrentBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(10), LocalDateTime.now().plusHours(5));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(4), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusMinutes(3), LocalDateTime.now().plusHours(185));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserBookingsByState(userDtoResponse2.getId(), "CURRENT");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldFindWaitingBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserBookingsByState(userDtoResponse2.getId(), "WAITING");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindAllItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "All");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindPastItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(5), LocalDateTime.now().minusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(3), LocalDateTime.now().minusHours(1));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "PAST");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldFindWaitingItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "WAITING");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindCurrentItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "CURRENT");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldFindFutureItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "FUTURE");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldNotFindItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+
+        Assertions.assertThatThrownBy(() -> bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "STATE")).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void shouldNotFindBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusMinutes(2), LocalDateTime.now().plusHours(115));
+
+        bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+
+        Assertions.assertThatThrownBy(() -> bookingService.getUserBookingsByState(userDtoResponse2.getId(), "STATE")).isInstanceOf(ValidationException.class);
+    }
+
+
+    @Test
+    void shouldFindRejectedBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+        BookingDto bookingDto1 = bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        BookingDto bookingDto2 = bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        BookingDto bookingDto3 = bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto1.getId(), false);
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto2.getId(), false);
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto3.getId(), false);
+
+        List<BookingDto> bookings = bookingService.getUserBookingsByState(userDtoResponse2.getId(), "REJECTED");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindRejectedItemBookings() {
+        UserDto userDtoResponse1 = userService.create(userDtoRequest1);
+        UserDto userDtoResponse2 = userService.create(userDtoRequest2);
+        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse1.getId());
+
+        BookingDtoRequest bookingDtoRequest1 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusHours(2));
+        BookingDtoRequest bookingDtoRequest2 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(4), LocalDateTime.now().plusHours(7));
+        BookingDtoRequest bookingDtoRequest3 = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().plusHours(8), LocalDateTime.now().plusHours(15));
+
+        BookingDto bookingDto1 = bookingService.create(bookingDtoRequest1, userDtoResponse2.getId());
+        BookingDto bookingDto2 = bookingService.create(bookingDtoRequest2, userDtoResponse2.getId());
+        BookingDto bookingDto3 = bookingService.create(bookingDtoRequest3, userDtoResponse2.getId());
+
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto1.getId(), false);
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto2.getId(), false);
+        bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDto3.getId(), false);
+
+        List<BookingDto> bookings = bookingService.getUserItemsBookingsByState(userDtoResponse1.getId(), "REJECTED");
+
+        Assertions.assertThat(bookings.size()).isEqualTo(3);
+    }
 }
 

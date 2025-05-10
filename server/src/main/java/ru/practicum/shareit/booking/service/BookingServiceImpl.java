@@ -38,9 +38,6 @@ public class BookingServiceImpl implements BookingService {
         if (booker.getId().equals(item.getOwner().getId())) {
             throw new ValidationException("Пользователь не может забронировать свою вещь.");
         }
-        if (bookingDtoRequest.getEnd().isBefore(LocalDateTime.now()) && bookingDtoRequest.getStart().isBefore(LocalDateTime.now())) {
-            throw new ValidationException("Даты начала и окончания бронирования не могут быть в прошлом.");
-        }
         if (bookingDtoRequest.getEnd().isBefore(bookingDtoRequest.getStart())) {
             throw new ValidationException("Дата окончания бронирования не может быть раньше начала.");
         }

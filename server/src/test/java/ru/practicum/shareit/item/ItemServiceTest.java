@@ -7,15 +7,21 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import ru.practicum.shareit.booking.service.BookingService;
+import ru.practicum.shareit.booking.dto.BookingDto;
+import ru.practicum.shareit.booking.dto.BookingDtoRequest;
+import ru.practicum.shareit.booking.service.BookingServiceImpl;
+import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
+import ru.practicum.shareit.exceptions.ValidationException;
+import ru.practicum.shareit.item.dto.CommentDtoRequest;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.dto.ItemDtoWithBooking;
-import ru.practicum.shareit.item.service.ItemService;
-import ru.practicum.shareit.request.service.ItemRequestService;
+import ru.practicum.shareit.item.service.ItemServiceImpl;
+import ru.practicum.shareit.request.service.ItemRequestServiceImpl;
 import ru.practicum.shareit.user.UserDto;
-import ru.practicum.shareit.user.service.UserService;
+import ru.practicum.shareit.user.service.UserServiceImpl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Transactional
@@ -24,16 +30,16 @@ import java.util.List;
 public class ItemServiceTest {
 
     @Autowired
-    ItemService itemService;
+    ItemServiceImpl itemService;
 
     @Autowired
-    UserService userService;
+    UserServiceImpl userService;
 
     @Autowired
-    BookingService bookingService;
+    BookingServiceImpl bookingService;
 
     @Autowired
-    ItemRequestService itemRequestService;
+    ItemRequestServiceImpl itemRequestService;
 
     static UserDto userOne;
     static UserDto userTwo;
@@ -59,6 +65,33 @@ public class ItemServiceTest {
     }
 
     @Test
+    void shouldNotCreateItemWithEmptyName() {
+        UserDto user = userService.create(userOne);
+        ItemDto item = new ItemDto(null, null, "some description", true, null,null);
+
+        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
+                .isInstanceOf(EmptyInformationException.class);
+    }
+
+    @Test
+    void shouldNotCreateItemWithEmptyDescription() {
+        UserDto user = userService.create(userOne);
+        ItemDto item = new ItemDto(null, "name", null, true, null,null);
+
+        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
+                .isInstanceOf(EmptyInformationException.class);
+    }
+
+    @Test
+    void shouldNotCreateItemWithEmptyStatus() {
+        UserDto user = userService.create(userOne);
+        ItemDto item = new ItemDto(null, "name", "some description", null, null,null);
+
+        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
+                .isInstanceOf(EmptyInformationException.class);
+    }
+
+    @Test
     void shouldNotCreateWhenUserNotFound() {
         Assertions.assertThatThrownBy(() -> itemService.create(itemDtoOne, 5L))
                 .isInstanceOf(NotFoundException.class);
@@ -73,6 +106,16 @@ public class ItemServiceTest {
         Assertions.assertThat(updatedItem.getName()).isEqualTo(itemDtoTwo.getName());
         Assertions.assertThat(updatedItem.getDescription()).isEqualTo(itemDtoTwo.getDescription());
         Assertions.assertThat(updatedItem.getAvailable()).isEqualTo(itemDtoTwo.getAvailable());
+    }
+
+    @Test
+    void shouldNotUpdateItem() {
+        UserDto owner = userService.create(userOne);
+        UserDto user = userService.create(userTwo);
+        ItemDto createdItem = itemService.create(itemDtoOne, owner.getId());
+
+        Assertions.assertThatThrownBy(() -> itemService.update(createdItem, user.getId(), createdItem.getId()))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -137,4 +180,69 @@ public class ItemServiceTest {
         Assertions.assertThat(foundItems.size()).isGreaterThanOrEqualTo(2);
     }
 
+    @Test
+    void shouldReturnItemsByEmptySearch() {
+        UserDto owner = userService.create(userOne);
+        itemService.create(itemDtoOne, owner.getId());
+        itemService.create(itemDtoTwo, owner.getId());
+
+        List<ItemDto> foundItems = itemService.search(null);
+
+        Assertions.assertThat(foundItems.isEmpty());
+    }
+
+    @Test
+    void shouldAddCommentWhenBookingExists() {
+        UserDto userDtoResponse1 = userService.create(userOne);
+        UserDto userDtoResponse2 = userService.create(userTwo);
+        ItemDto itemDtoResponse = itemService.create(itemDtoOne, userDtoResponse1.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(2), LocalDateTime.now().minusHours(1));
+        BookingDto bookingDtoResponse = bookingService.create(bookingDtoRequest, userDtoResponse2.getId());
+
+        BookingDto bookingApproveDto = bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDtoResponse.getId(),
+                true);
+
+        CommentDtoRequest commentRequest = new CommentDtoRequest("Some text");
+        itemService.addComment(commentRequest, itemDtoResponse.getId(), bookingApproveDto.getBooker().getId());
+
+        ItemDtoWithBooking itemWithComments = itemService.getById(userDtoResponse1.getId(), itemDtoResponse.getId());
+
+        Assertions.assertThat(itemWithComments.getComments()).hasSize(1);
+        Assertions.assertThat(itemWithComments.getComments().get(0).getText()).isEqualTo("Some text");
+    }
+
+    @Test
+    void shouldNotAddCommentWhenCommentIsEmpty() {
+        UserDto userDtoResponse1 = userService.create(userOne);
+        UserDto userDtoResponse2 = userService.create(userTwo);
+        ItemDto itemDtoResponse = itemService.create(itemDtoOne, userDtoResponse1.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(2), LocalDateTime.now().minusHours(1));
+        BookingDto bookingDtoResponse = bookingService.create(bookingDtoRequest, userDtoResponse2.getId());
+        BookingDto bookingApproveDto = bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDtoResponse.getId(),
+                true);
+
+        CommentDtoRequest commentRequest = new CommentDtoRequest(" ");
+        Assertions.assertThatThrownBy(() -> itemService.addComment(commentRequest, itemDtoResponse.getId(), bookingApproveDto.getBooker().getId()))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void shouldNotAddCommentWhenThereIsNoBooking() {
+        UserDto userDtoResponse1 = userService.create(userOne);
+        UserDto userDtoResponse2 = userService.create(userTwo);
+        UserDto userDtoResponse3 = userService.create(new UserDto(null, "His name", "andSome@Email.com"));
+        ItemDto itemDtoResponse = itemService.create(itemDtoOne, userDtoResponse1.getId());
+        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
+                LocalDateTime.now().minusHours(2), LocalDateTime.now().minusHours(1));
+        BookingDto bookingDtoResponse = bookingService.create(bookingDtoRequest, userDtoResponse2.getId());
+        BookingDto bookingApproveDto = bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDtoResponse.getId(),
+                true);
+
+        CommentDtoRequest commentRequest = new CommentDtoRequest("text");
+        itemService.addComment(commentRequest, itemDtoResponse.getId(), bookingApproveDto.getBooker().getId());
+        Assertions.assertThatThrownBy(() -> itemService.addComment(commentRequest, itemDtoResponse.getId(), userDtoResponse3.getId()))
+                .isInstanceOf(ValidationException.class);
+    }
 }

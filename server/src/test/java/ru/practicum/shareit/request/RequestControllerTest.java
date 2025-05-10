@@ -1,5 +1,6 @@
 package ru.practicum.shareit.request;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.request.dto.ItemRequestDto;
 import ru.practicum.shareit.request.dto.ItemRequestDtoResponse;
-import ru.practicum.shareit.request.service.ItemRequestService;
+import ru.practicum.shareit.request.service.ItemRequestServiceImpl;
 import ru.practicum.shareit.user.UserDto;
 import ru.practicum.shareit.user.UserMapper;
 
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class RequestControllerTest {
 
     @Mock
-    ItemRequestService requestService;
+    ItemRequestServiceImpl requestService;
 
     private MockMvc mvc;
 
@@ -89,6 +90,44 @@ public class RequestControllerTest {
         mvc.perform(get("/requests/all")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldFindAllRequests() throws Exception {
+        when(requestService.findAllRequests(anyLong()))
+                .thenReturn(List.of(requestDtoResponse));
+
+        mvc.perform(get("/requests/all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Sharer-User-Id", userDto.getId()))
+                .andExpect(status().isOk())
+                .andExpect((result -> {
+                    String json = result.getResponse().getContentAsString();
+                    List<ItemRequestDtoResponse> dtos = mapper.readValue(json, new TypeReference<>() {
+                    });
+                    if (dtos.isEmpty()) {
+                        throw new AssertionError("Empty ItemDtoResponse list");
+                    }
+                }));
+    }
+
+    @Test
+    void findUserRequests_shouldFindAllUserRequests() throws Exception {
+        when(requestService.findUserRequests(anyLong()))
+                .thenReturn(List.of(requestDtoResponse));
+
+        mvc.perform(get("/requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Sharer-User-Id", userDto.getId()))
+                .andExpect(status().isOk())
+                .andExpect((result -> {
+                    String json = result.getResponse().getContentAsString();
+                    List<ItemRequestDtoResponse> dtos = mapper.readValue(json, new TypeReference<>() {
+                    });
+                    if (dtos.isEmpty()) {
+                        throw new AssertionError("Empty ItemDtoResponse list");
+                    }
+                }));
     }
 
 }

@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import ru.practicum.shareit.exceptions.EmailExistsException;
 import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
-import ru.practicum.shareit.user.service.UserService;
+import ru.practicum.shareit.user.service.UserServiceImpl;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ import java.util.List;
 public class UserServiceTest {
 
     @Autowired
-    private final UserService userService;
+    private final UserServiceImpl userService;
     private UserDto userOne;
     private UserDto userTwo;
 
@@ -33,6 +33,12 @@ public class UserServiceTest {
 
     @Test
     void shouldCreateUser() {
+        Assertions.assertThatThrownBy(() -> userService.create(new UserDto(null, "name", "someemail")))
+                .isInstanceOf(EmptyInformationException.class);
+    }
+
+    @Test
+    void shouldNotCreateUser() {
         UserDto userCreated = userService.create(userOne);
 
         Assertions.assertThat(userCreated.getId()).isNotNull();
