@@ -11,7 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import ru.practicum.shareit.exceptions.EmailExistsException;
 import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
-import ru.practicum.shareit.user.service.UserServiceImpl;
+import ru.practicum.shareit.user.service.UserService;
 
 import java.util.List;
 
@@ -21,7 +21,7 @@ import java.util.List;
 public class UserServiceTest {
 
     @Autowired
-    private final UserServiceImpl userService;
+    private final UserService userService;
     private UserDto userOne;
     private UserDto userTwo;
 

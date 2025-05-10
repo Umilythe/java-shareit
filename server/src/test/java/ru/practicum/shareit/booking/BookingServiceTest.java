@@ -29,13 +29,13 @@ import static ru.practicum.shareit.booking.model.Status.REJECTED;
 public class BookingServiceTest {
 
     @Autowired
-    ItemServiceImpl itemService;
+    ItemService itemService;
 
     @Autowired
-    UserServiceImpl userService;
+    UserService userService;
 
     @Autowired
-    BookingServiceImpl bookingService;
+    BookingService bookingService;
 
     static UserDto userDtoRequest1;
     static UserDto userDtoRequest2;

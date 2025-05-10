@@ -10,9 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.request.dto.ItemRequestDto;
 import ru.practicum.shareit.request.dto.ItemRequestDtoResponse;
-import ru.practicum.shareit.request.service.ItemRequestServiceImpl;
+import ru.practicum.shareit.request.service.ItemRequestService;
 import ru.practicum.shareit.user.UserDto;
-import ru.practicum.shareit.user.service.UserServiceImpl;
+import ru.practicum.shareit.user.service.UserService;
 
 import java.util.List;
 
@@ -21,9 +21,9 @@ import java.util.List;
 @SpringBootTest
 public class RequestServiceTest {
     @Autowired
-    private final ItemRequestServiceImpl itemRequestService;
+    private final ItemRequestService itemRequestService;
     @Autowired
-    private final UserServiceImpl userService;
+    private final UserService userService;
     static UserDto userOne;
     static UserDto userTwo;
     static ItemRequestDto itemRequestDto;

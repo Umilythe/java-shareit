@@ -14,7 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.request.dto.ItemRequestDto;
 import ru.practicum.shareit.request.dto.ItemRequestDtoResponse;
-import ru.practicum.shareit.request.service.ItemRequestServiceImpl;
+import ru.practicum.shareit.request.service.ItemRequestService;
 import ru.practicum.shareit.user.UserDto;
 import ru.practicum.shareit.user.UserMapper;
 
@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class RequestControllerTest {
 
     @Mock
-    ItemRequestServiceImpl requestService;
+    ItemRequestService requestService;
 
     private MockMvc mvc;
 

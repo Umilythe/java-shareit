@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingDtoRequest;
 import ru.practicum.shareit.booking.model.Status;
-import ru.practicum.shareit.booking.service.BookingServiceImpl;
+import ru.practicum.shareit.booking.service.BookingService;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.user.User;
 
@@ -35,7 +35,7 @@ public class BookingControllerTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Mock
-    private BookingServiceImpl bookingService;
+    private BookingService bookingService;
 
     @InjectMocks
     private BookingController controller;
