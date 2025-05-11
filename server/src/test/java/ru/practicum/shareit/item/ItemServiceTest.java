@@ -10,7 +10,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import ru.practicum.shareit.booking.dto.BookingDto;
 import ru.practicum.shareit.booking.dto.BookingDtoRequest;
 import ru.practicum.shareit.booking.service.BookingService;
-import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.exceptions.ValidationException;
 import ru.practicum.shareit.item.dto.CommentDtoRequest;
@@ -62,33 +61,6 @@ public class ItemServiceTest {
         Assertions.assertThat(createdItem.getName()).isEqualTo(itemDtoOne.getName());
         Assertions.assertThat(createdItem.getDescription()).isEqualTo(itemDtoOne.getDescription());
         Assertions.assertThat(createdItem.getAvailable()).isEqualTo(itemDtoOne.getAvailable());
-    }
-
-    @Test
-    void shouldNotCreateItemWithEmptyName() {
-        UserDto user = userService.create(userOne);
-        ItemDto item = new ItemDto(null, null, "some description", true, null,null);
-
-        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
-                .isInstanceOf(EmptyInformationException.class);
-    }
-
-    @Test
-    void shouldNotCreateItemWithEmptyDescription() {
-        UserDto user = userService.create(userOne);
-        ItemDto item = new ItemDto(null, "name", null, true, null,null);
-
-        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
-                .isInstanceOf(EmptyInformationException.class);
-    }
-
-    @Test
-    void shouldNotCreateItemWithEmptyStatus() {
-        UserDto user = userService.create(userOne);
-        ItemDto item = new ItemDto(null, "name", "some description", null, null,null);
-
-        Assertions.assertThatThrownBy(() -> itemService.create(item, user.getId()))
-                .isInstanceOf(EmptyInformationException.class);
     }
 
     @Test
@@ -210,22 +182,6 @@ public class ItemServiceTest {
 
         Assertions.assertThat(itemWithComments.getComments()).hasSize(1);
         Assertions.assertThat(itemWithComments.getComments().get(0).getText()).isEqualTo("Some text");
-    }
-
-    @Test
-    void shouldNotAddCommentWhenCommentIsEmpty() {
-        UserDto userDtoResponse1 = userService.create(userOne);
-        UserDto userDtoResponse2 = userService.create(userTwo);
-        ItemDto itemDtoResponse = itemService.create(itemDtoOne, userDtoResponse1.getId());
-        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
-                LocalDateTime.now().minusHours(2), LocalDateTime.now().minusHours(1));
-        BookingDto bookingDtoResponse = bookingService.create(bookingDtoRequest, userDtoResponse2.getId());
-        BookingDto bookingApproveDto = bookingService.changeBookingStatus(userDtoResponse1.getId(), bookingDtoResponse.getId(),
-                true);
-
-        CommentDtoRequest commentRequest = new CommentDtoRequest(" ");
-        Assertions.assertThatThrownBy(() -> itemService.addComment(commentRequest, itemDtoResponse.getId(), bookingApproveDto.getBooker().getId()))
-                .isInstanceOf(ValidationException.class);
     }
 
     @Test

@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.exceptions.NotFoundException;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.dto.ItemMapper;
+import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.storage.ItemStorage;
 import ru.practicum.shareit.request.dto.ItemRequestDto;
 import ru.practicum.shareit.request.dto.ItemRequestDtoResponse;
@@ -16,6 +17,7 @@ import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.storage.UserStorage;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,10 +42,15 @@ public class ItemRequestServiceImpl implements ItemRequestService {
              .stream()
              .map(ItemRequestMapper::toItemRequestDto)
              .collect(Collectors.toList());
-        itemRequestDtoResponses.forEach(itemRequestDto -> itemRequestDto.setItems(itemStorage.findAllByRequestId(itemRequestDto.getId())
-                .stream()
-                .map(ItemMapper::toItemDto)
-                .collect(Collectors.toList())));
+     List<Long> itemRequestIds = itemRequestDtoResponses.stream()
+                     .map(ItemRequestDtoResponse::getId)
+                     .collect(Collectors.toList());
+     List<Item> allItems = itemStorage.findAllByRequestIdIn(itemRequestIds);
+     Map<Long, List<ItemDto>> itemsMap = allItems.stream()
+                     .collect(Collectors.groupingBy(
+                             i -> i.getRequest().getId(),
+                             Collectors.mapping(ItemMapper::toItemDto, Collectors.toList())));
+        itemRequestDtoResponses.forEach(itemRequestDto -> itemRequestDto.setItems(itemsMap.get(itemRequestDto.getId())));
         return itemRequestDtoResponses;
     }
 
@@ -71,7 +78,7 @@ public class ItemRequestServiceImpl implements ItemRequestService {
 
     private User findUser(Long userId) {
         User user = userStorage.findById(userId)
-                .orElseThrow(() -> (new NotFoundException("Пользователь не найден.")));
+                .orElseThrow(() -> (new NotFoundException("Пользователь c id = " + userId + " не найден.")));
         return user;
     }
 }

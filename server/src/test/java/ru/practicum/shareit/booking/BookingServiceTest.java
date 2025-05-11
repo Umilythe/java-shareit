@@ -91,18 +91,6 @@ public class BookingServiceTest {
     }
 
     @Test
-    void shouldNotCreateBookingWithEndBeforePast() {
-        UserDto userDtoResponse = userService.create(userDtoRequest1);
-        UserDto booker = userService.create(userDtoRequest2);
-        ItemDto itemDtoResponse = itemService.create(itemDtoRequest1, userDtoResponse.getId());
-        BookingDtoRequest bookingDtoRequest = new BookingDtoRequest(itemDtoResponse.getId(),
-                LocalDateTime.now().plusHours(3), LocalDateTime.now().plusHours(1));
-
-        Assertions.assertThatThrownBy(() ->
-                bookingService.create(bookingDtoRequest, booker.getId())).isInstanceOf(ValidationException.class);
-    }
-
-    @Test
     void shouldNotCreateBookingNotAvailableItem() {
         UserDto userDtoResponse = userService.create(userDtoRequest1);
         ItemDto itemDtoNotAvailable =

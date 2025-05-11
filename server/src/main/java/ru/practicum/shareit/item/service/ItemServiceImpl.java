@@ -5,9 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.storage.BookingStorage;
-import ru.practicum.shareit.exceptions.EmptyInformationException;
 import ru.practicum.shareit.exceptions.NotFoundException;
+import ru.practicum.shareit.exceptions.ValidationException;
 import ru.practicum.shareit.item.dto.*;
+import ru.practicum.shareit.item.model.Comment;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.storage.CommentStorage;
 import ru.practicum.shareit.item.storage.ItemStorage;
@@ -17,8 +18,6 @@ import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.UserDto;
 import ru.practicum.shareit.user.UserMapper;
 import ru.practicum.shareit.user.service.UserService;
-import ru.practicum.shareit.exceptions.ValidationException;
-import ru.practicum.shareit.item.model.Comment;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -37,19 +36,11 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public ItemDto create(ItemDto itemDto, Long ownerId) {
-        if (itemDto.getName() == null || itemDto.getName().isEmpty()) {
-            throw new EmptyInformationException("Имя не может быть пустым.");
-        }
-        if (itemDto.getDescription() == null || itemDto.getDescription().isEmpty()) {
-            throw new EmptyInformationException("Описание не может быть пустым");
-        }
-        if (itemDto.getAvailable() == null) {
-            throw new EmptyInformationException("Статус не может быть пустым");
-        }
         User owner = UserMapper.toUser(userService.getById(ownerId));
         ItemRequest itemRequest = null;
         if (itemDto.getRequestId() != null) {
-            itemRequest = itemRequestStorage.findById(itemDto.getRequestId()).orElse(null);
+            itemRequest = itemRequestStorage.findById(itemDto.getRequestId())
+                    .orElseThrow(() -> new ValidationException("Указан неверный запрос."));
         }
         Item item = ItemMapper.toItem(itemDto, owner, itemRequest);
         return ItemMapper.toItemDto(itemStorage.save(item));
@@ -126,9 +117,6 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public List<ItemDto> search(String text) {
-        if (text == null || text.isBlank()) {
-            return new ArrayList<>();
-        }
         return itemStorage.search(text).stream()
                 .filter(Item::isAvailable)
                 .map(ItemMapper::toItemDto)
@@ -138,9 +126,6 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public CommentDtoResponse addComment(CommentDtoRequest commentDtoRequest, Long itemId, Long userId) {
-        if (commentDtoRequest.getText() == null || commentDtoRequest.getText().isBlank()) {
-            throw new ValidationException("Текст комментария не может быть пустым.");
-        }
         UserDto authorDto = userService.getById(userId);
         Item item = getItem(itemId);
         List<Booking> bookings = bookingStorage.findAllByBookerIdAndItemIdAndEndBefore(userId, itemId, LocalDateTime.now());

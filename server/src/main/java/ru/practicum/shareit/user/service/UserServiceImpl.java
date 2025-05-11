@@ -27,7 +27,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserDto create(UserDto userDto) {
-        validateEmail(userDto.getEmail());
         isEmailUsed(userDto);
         User user = UserMapper.toUser(userDto);
         return UserMapper.toUserDto(userStorage.save(user));
@@ -72,10 +71,6 @@ public class UserServiceImpl implements UserService {
     }
 
     private void validateEmail(String email) {
-        if (email == null) {
-            log.error("Информация о пользователе должна содержать email.");
-            throw new EmptyInformationException("Информация о пользователе должна содержать email.");
-        }
         if (!email.contains("@")) {
             log.error("Email такого формата не может быть использован.");
             throw new EmptyInformationException("Email такого формата не может быть использован.");

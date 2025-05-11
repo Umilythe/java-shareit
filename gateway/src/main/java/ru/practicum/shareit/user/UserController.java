@@ -2,12 +2,15 @@ package ru.practicum.shareit.user;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ru.practicum.shareit.exception.EmptyInformationException;
 
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
+@Slf4j
 public class UserController {
 
     private final UserClient userClient;
@@ -24,6 +27,14 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<Object> create(@Valid @RequestBody UserDto user) {
+        if (user.getEmail() == null) {
+            log.error("Информация о пользователе должна содержать email.");
+            throw new EmptyInformationException("Информация о пользователе должна содержать email.");
+        }
+        if (!user.getEmail().contains("@")) {
+            log.error("Email такого формата не может быть использован.");
+            throw new EmptyInformationException("Email такого формата не может быть использован.");
+        }
         return userClient.create(user);
     }
 

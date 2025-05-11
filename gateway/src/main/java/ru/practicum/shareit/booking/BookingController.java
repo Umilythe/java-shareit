@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.shareit.booking.dto.BookingDtoRequest;
 import ru.practicum.shareit.booking.dto.BookingState;
+import ru.practicum.shareit.exception.ValidationException;
 
 
 @Controller
@@ -23,6 +24,9 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<Object> bookItem(@RequestBody @Valid BookingDtoRequest bookingDtoRequest,
                              @RequestHeader("X-Sharer-User-Id") Long userId) {
+        if (bookingDtoRequest.getEnd().isBefore(bookingDtoRequest.getStart())) {
+            throw new ValidationException("Дата окончания бронирования не может быть раньше начала.");
+        }
         log.info("Creating booking {}, userId={}", bookingDtoRequest, userId);
         return bookingClient.bookItem(userId, bookingDtoRequest);
     }

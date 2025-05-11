@@ -33,12 +33,6 @@ public class UserServiceTest {
 
     @Test
     void shouldCreateUser() {
-        Assertions.assertThatThrownBy(() -> userService.create(new UserDto(null, "name", "someemail")))
-                .isInstanceOf(EmptyInformationException.class);
-    }
-
-    @Test
-    void shouldNotCreateUser() {
         UserDto userCreated = userService.create(userOne);
 
         Assertions.assertThat(userCreated.getId()).isNotNull();
@@ -95,18 +89,10 @@ public class UserServiceTest {
     }
 
     @Test
-    void shouldNotCreateUserWithEmptyEmail() {
-        UserDto userForTest = new UserDto(null, "someName", null);
-
-        Assertions.assertThatThrownBy(() -> userService.create(userForTest))
-                .isInstanceOf(EmptyInformationException.class);
-    }
-
-    @Test
     void shouldNotUpdateUserWithStrangeId() {
         UserDto userCreated = userService.create(userOne);
         UserDto userForUpdate = new UserDto(null, "name", "andemail.com");
-        Assertions.assertThatThrownBy(() -> userService.update(2L, userForUpdate))
-                .isInstanceOf(NotFoundException.class);
+        Assertions.assertThatThrownBy(() -> userService.update(userCreated.getId(), userForUpdate))
+                .isInstanceOf(EmptyInformationException.class);
     }
 }
